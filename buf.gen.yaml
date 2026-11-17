@@ -1,0 +1,18 @@
+version: v2
+plugins:
+  - local: protoc-gen-go
+    out: .
+    opt: module=recsys-workshop
+  - local: protoc-gen-go-grpc
+    out: .
+    opt: module=recsys-workshop
+  - local: protoc-gen-go-vtproto
+    out: .
+    opt:
+      - module=recsys-workshop
+      - features=marshal+unmarshal+size+pool
+      - pool=recsys-workshop/pkg/pbpool.Metadata
+      - pool=recsys-workshop/pkg/pbpool.AdvBids
+      - pool=recsys-workshop/pkg/pbpool.Candidate
+      - pool=recsys-workshop/pkg/pbpool.RetrievalResponse
+      - pool=recsys-workshop/pkg/pbpool.CandidateBatchResponse

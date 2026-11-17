@@ -1,0 +1,62 @@
+x-app: &app
+  build: .
+  image: recsys-workshop:latest
+  init: true
+  restart: unless-stopped
+
+x-healthcheck: &healthcheck
+  interval: 3s
+  timeout: 2s
+  retries: 20
+  start_period: 5s
+
+services:
+  candidates-retrieval:
+    <<: *app
+    command: ["candidates-retrieval"]
+    ports:
+      - "50051:50051"
+      - "6061:6061"
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50051", "grpc.health.v1.Health/Check"]
+
+  feature-store:
+    <<: *app
+    command: ["feature-store"]
+    ports:
+      - "50052:50052"
+      - "6062:6062"
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50052", "grpc.health.v1.Health/Check"]
+
+  orchestrator:
+    <<: *app
+    command: ["orchestrator"]
+    environment:
+      CANDIDATES_ADDR: candidates-retrieval:50051
+      FEATURE_STORE_ADDR: feature-store:50052
+    ports:
+      - "50050:50050"
+      - "6060:6060"
+    depends_on:
+      candidates-retrieval:
+        condition: service_healthy
+      feature-store:
+        condition: service_healthy
+    healthcheck:
+      <<: *healthcheck
+      test: ["CMD", "grpcurl", "-plaintext", "localhost:50050", "grpc.health.v1.Health/Check"]
+
+  toolbox:
+    <<: *app
+    command: ["sleep", "infinity"]
+    volumes:
+      - ./profiles:/workspace/profiles
+    ports:
+      - "8080:8080" # pprof UI: Orchestrator
+      - "8081:8081" # pprof UI: Feature Store
+    depends_on:
+      orchestrator:
+        condition: service_healthy

@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package recsys.v1;
+
+option go_package = "recsys-workshop/pkg/pb;pb";
+
+message FloatVector {
+  repeated float values = 1;
+}
+
+message GetFeaturesRequest {
+  repeated uint64 entity_ids = 1; // Candidate IDs (N = 300 or 1000).
+  repeated string feature_names = 2; // Requested feature names, e.g. ["f_0", "f_1", ...].
+}
+
+// --- Iteration 1: Feast ServingService style (N * M FeatureValue allocations) ---
+
+message FeatureValue {
+  oneof val {
+    float float_val = 1;
+    uint32 uint32_val = 2;
+    bytes bytes_val = 3;
+    FloatVector vector_val = 4;
+  }
+}
+
+message EntityFeatures {
+  // Values follow exactly the order of feature_names in the request/response.
+  repeated FeatureValue features = 1;
+}
+
+message GetFeaturesResponse {
+  repeated string feature_names = 1; // Feature names (column order).
+  repeated EntityFeatures entities = 2; // One entry per entity_id from the request.
+}
+
+// --- Iteration 2: 1D Flat Matrix with Stride + schema descriptors ---
+
+enum FeatureDataType {
+  FEATURE_DATA_TYPE_UNSPECIFIED = 0;
+  FEATURE_DATA_TYPE_FLOAT = 1;
+  FEATURE_DATA_TYPE_UINT32_AS_FLOAT = 2;
+  FEATURE_DATA_TYPE_FLOAT_VECTOR = 3;
+}
+
+message FeatureDescriptor {
+  string name = 1; // Feature name.
+  FeatureDataType data_type = 2; // Feature data type.
+  uint32 offset = 3; // Offset of the feature inside a single candidate's stride.
+  uint32 length = 4; // Length in float elements (1 for a scalar, K for a vector).
+}
+
+message FlatFeaturesResponse {
+  uint32 num_entities = 1; // Number of candidates N.
+  uint32 stride = 2; // Total length of one candidate row (sum of all descriptor lengths).
+  repeated FeatureDescriptor features = 3; // Row layout: M descriptors per batch, not N*M.
+  repeated float values = 4; // Flat buffer of length num_entities * stride.
+}
+
+service FeatureStoreService {
+  rpc GetFeaturesV1(GetFeaturesRequest) returns (GetFeaturesResponse);
+  rpc GetFeaturesV2Flat(GetFeaturesRequest) returns (FlatFeaturesResponse);
+}

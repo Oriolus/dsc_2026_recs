@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package recsys.v1;
+
+option go_package = "recsys-workshop/pkg/pb;pb";
+
+// PipelineMode selects the workshop iteration executed by the orchestrator.
+enum PipelineMode {
+  PIPELINE_MODE_UNSPECIFIED = 0;
+  PIPELINE_MODE_V1_FEAST_ONEOF = 1;
+  PIPELINE_MODE_V2_FLAT_STRIDE = 2;
+  PIPELINE_MODE_V3_FAT_NAIVE = 3;
+  PIPELINE_MODE_V3_FAT_VTPOOL = 4;
+  PIPELINE_MODE_V4_FAT_POOLED = 5;
+}
+
+message RecommendRequest {
+  uint64 user_id = 1;
+  uint32 num_candidates = 2; // Number of candidates fetched from Candidates Retrieval (e.g. 300 or 1000).
+  uint32 num_features = 3; // Number of feature names requested from Feature Store (e.g. 40 or 120).
+  PipelineMode mode = 4; // Workshop iteration switch.
+}
+
+message RecommendedItem {
+  uint64 item_id = 1;
+  float score = 2;
+}
+
+message RecommendResponse {
+  repeated RecommendedItem items = 1;
+}
+
+service RecommendationService {
+  rpc GetRecommendations(RecommendRequest) returns (RecommendResponse);
+}

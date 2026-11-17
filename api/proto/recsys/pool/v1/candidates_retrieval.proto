@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package recsys.pool.v1;
+
+// Wire-compatible copy of recsys/v1/candidates_retrieval.proto messages.
+// Field numbers MUST stay in sync with recsys/v1/candidates_retrieval.proto.
+// A separate proto package avoids protoregistry conflicts when pkg/pb and
+// pkg/pbpool are linked into the same binary.
+option go_package = "recsys-workshop/pkg/pbpool;pbpool";
+
+message Metadata {
+  uint64 seller_id = 1;
+  uint32 category_id = 2;
+  uint32 brand_id = 3;
+  uint32 flags = 4;
+  float item_weight = 5;
+  uint32 warehouse_id = 6;
+}
+
+message AdvBids {
+  uint64 campaign_id = 1;
+  float cpc_bid = 2;
+  float cpm_bid = 3;
+  uint32 target_slot = 4;
+}
+
+message Candidate {
+  uint64 id = 1;
+  Metadata metadata = 2;
+  AdvBids adv_bids = 3;
+  float retrieval_score = 4;
+}
+
+message RetrievalResponse {
+  repeated Candidate candidates = 1;
+}
+
+message CandidateBatchResponse {
+  repeated uint64 ids = 1;
+  repeated float retrieval_scores = 2;
+  repeated Metadata metadata = 3;
+  repeated AdvBids adv_bids = 4;
+}
