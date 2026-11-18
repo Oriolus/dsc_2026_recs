@@ -9,7 +9,7 @@ compiles `buf`, `ghz`, `grpcurl`, `benchstat` and the protobuf plugins: it takes
 5-15 minutes and ~3 GB of disk. Conference Wi-Fi is not the place for it.
 
 Resources for the Docker VM: **4 CPUs and 4 GB RAM** (3 GB is the minimum).
-CPUs matter more than memory: load tests run at 250 rps, and with fewer CPUs
+CPUs matter more than memory: load tests run at 237 rps, and with fewer CPUs
 latency numbers get noisy. See [Memory budget](#memory-budget) for the measurements.
 
 Network: the build talks only to Docker Hub, `deb.debian.org`,
@@ -226,7 +226,7 @@ cold build cache):
 | Phase | Peak | Dominated by |
 |---|---|---|
 | Image build | ~1.05 GiB | `go install buf` (steps run one by one; `go build ./cmd/...` ~0.7 GiB) |
-| Workshop load, 250 rps, concurrency 16 | ~0.77 GiB | `v2_flat` / `v1_heavy`: orchestrator ~260 MiB + feature-store ~305 MiB + ghz ~150 MiB + candidates ~55 MiB |
+| Workshop load, ~240 rps, concurrency 16 | ~0.77 GiB | `v2_flat` / `v1_heavy`: orchestrator ~260 MiB + feature-store ~305 MiB + ghz ~150 MiB + candidates ~55 MiB |
 | `make bench-compare` | ~0.23 GiB | runs without load |
 | `go tool pprof` / graphviz | < 0.1 GiB | |
 

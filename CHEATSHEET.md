@@ -63,7 +63,7 @@ docker compose exec toolbox grpcurl -plaintext \
 | 5 | `make test-anomaly-cap` | Unit test: a batch with `cap > maxRetainedCap (1500)` is never pooled |
 | - | `make pprof-ui SVC=... AMMO=... KIND=allocs\|cpu [BASE=...]` | pprof web UI for a saved profile |
 
-Load parameters (env of `scripts/shoot.sh` / `scripts/profile.sh`): `RPS=250`,
+Load parameters (env of `scripts/shoot.sh` / `scripts/profile.sh`): `RPS=237` (deliberately not 250, see below),
 `CONCURRENCY=16`, `DURATION=30s`. Override them, for example:
 `docker compose exec -e RPS=500 toolbox ./scripts/shoot.sh v2_flat`.
 
@@ -208,7 +208,8 @@ Microbenchmarks, N=1000 candidates, one full cycle "take from pool → `Unmarsha
 | `Unmarshal_AoS_VTPool` (`ReturnToVTPool`) | ~120 000 | ~45 | 0 |
 | `Unmarshal_BatchPool_CustomReset` (`GetBatch`/`PutBatch`) | ~62 000 | ~10 | 0 |
 
-End-to-end (same machine, services running natively, 250 rps, 20 s profile window):
+End-to-end (same machine, services running natively on macOS, measured at 250 rps before
+the default changed to 237, 20 s profile window):
 
 Blocks 1-2 (no focus, whole process):
 
@@ -236,9 +237,62 @@ v4 still allocates: regularly a request gets a fresh, empty batch from `New`.
 Reason: `sync.Pool` is cleared on every GC cycle (objects survive one more cycle in the
 victim cache). The orchestrator's live heap is tiny (~7 MB), so with `GOGC=100` the GC
 goal is ~15 MB, and the ~0.5 MiB per request of the flat feature response alone triggers
-a GC roughly every 20 ms at 250 rps (`GODEBUG=gctrace=1`), comparable to how often each
+a GC roughly every 20 ms at ~240 rps (`GODEBUG=gctrace=1`), comparable to how often each
 P sees a request. A pool is only as warm as the GC lets it be: check the GC rate before
 trusting a pool, and look at what else allocates on the same hot path.
+
+The cleanup is unconditional: `gcStart` calls `poolCleanup()` (`sync/pool.go`) with the
+world stopped, which drops every pool's victim cache and moves the primary cache to the
+victim. An object lives in a pool for at most two GC cycles, however much free memory
+there is and whatever triggered the GC. Free memory alone does not help either: the GC
+paces by `GOGC` relative to the live heap and ignores the container's memory.
+
+Demo: let the GC run only near a memory limit and re-profile (no rebuild, only the
+orchestrator container is recreated):
+
+```sh
+ORCH_GOGC=off ORCH_GOMEMLIMIT=512MiB make up    # plain `make up` restores the defaults
+make profile-v3-vtpool && make profile-v4-pooled
+```
+
+Example run, 237 rps, Docker on Colima, objects allocated on the Candidates Retrieval
+path per request:
+
+| | GC rate | `v3_vtpool` | `v4_pooled` |
+|---|---|---|---|
+| `GOGC=100` (default) | ~44 per second | ~354 | ~422 |
+| `GOGC=off GOMEMLIMIT=512MiB` | ~1 per 2 seconds | ~154 | ~68 |
+
+The orchestrator then holds ~0.5 GiB of RSS instead of tens of MiB. In production
+`GOGC=off` is risky: if the live heap approaches the limit, the GC runs almost
+continuously.
+
+### Discussion point: why 237 rps
+
+At exactly 250 rps in Docker on Colima, CPU profiles of the same mode disagree between
+runs by several times: in two back-to-back `v3_naive` runs `fetchFatCandidatesNaive` took
+3.15 s vs 2.11 s and `getFlatFeatures` 1.11 s vs 6.18 s of CPU for identical work, and
+v3 looked cheaper than v4 on the Candidates Retrieval path.
+
+Reason: the Colima VM kernel is built with `CONFIG_HZ=250` and tick-based CPU accounting
+(`CONFIG_TICK_CPU_ACCOUNTING=y`). Thread CPU time advances only on kernel ticks, so the
+profiler's CPU timers fire only on 4 ms tick boundaries. ghz at 250 rps starts a request
+every 4 ms as well: the sampler locks onto one phase of request processing, and which
+phase depends on the random offset at start. The profile is consistent, just wrong.
+
+At 237 rps the two rates drift against each other and runs agree. Orchestrator CPU on the
+Candidates Retrieval path (focus regexp above), Docker on Colima, two runs each:
+
+| Mode | CPU in focus, 20 s window | share of process CPU |
+|---|---|---|
+| `v3_naive` | 0.99 s / 0.94 s | ~7% |
+| `v3_vtpool` | 1.09 s / 1.42 s (`ReturnToVTPool` 0.34-0.58 s of it) | ~9-11% |
+| `v4_pooled` | 0.61 s / 0.58 s | ~5% |
+
+Check your kernel: `colima ssh -- sh -c 'zcat /proc/config.gz | grep -E "^CONFIG_HZ="'`.
+Lesson: a sampling profiler aliases with any periodic load. Avoid load rates that are
+simple fractions or multiples of the tick rate (100, 250, 300, 1000 Hz), and compare
+at least two runs before drawing conclusions.
 
 ## Running without Docker
 

@@ -37,6 +37,10 @@ services:
     environment:
       CANDIDATES_ADDR: candidates-retrieval:50051
       FEATURE_STORE_ADDR: feature-store:50052
+      # GC tuning for the sync.Pool vs GC discussion, e.g.
+      # ORCH_GOGC=off ORCH_GOMEMLIMIT=512MiB make up
+      GOGC: ${ORCH_GOGC:-100}
+      GOMEMLIMIT: ${ORCH_GOMEMLIMIT:-off}
     ports:
       - "50050:50050"
       - "6060:6060"
