@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # Load test of the orchestrator with ghz.
 # Usage: scripts/shoot.sh <ammo>   (e.g. v1_small, v2_flat, v4_pooled)
-# Env: RPS (250), CONCURRENCY (16), DURATION (30s), ORCH_HOST (orchestrator).
+# Env: RPS (237), CONCURRENCY (16), DURATION (30s), ORCH_HOST (orchestrator).
 set -e
 . "$(dirname "$0")/lib.sh"
 

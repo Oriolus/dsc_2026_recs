@@ -7,7 +7,9 @@ FS_HOST="${FS_HOST:-feature-store}"
 CR_HOST="${CR_HOST:-candidates-retrieval}"
 ORCH_ADDR="${ORCH_ADDR:-${ORCH_HOST}:50050}"
 
-RPS="${RPS:-250}"
+# 237, not 250: a request rate in step with the kernel tick rate skews CPU
+# profiles (see "Discussion point: why 237 rps" in CHEATSHEET.md).
+RPS="${RPS:-237}"
 CONCURRENCY="${CONCURRENCY:-16}"
 DURATION="${DURATION:-30s}"
 

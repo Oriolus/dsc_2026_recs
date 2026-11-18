@@ -6,7 +6,7 @@
 # Usage: scripts/profile.sh <ammo> <service[,service...]> [diff-base-ammo]
 #   service: orchestrator | feature-store | candidates-retrieval
 #   diff-base-ammo: earlier profiles to compare with (pprof -diff_base)
-# Env: RPS (250), CONCURRENCY (16), ORCH_HOST, FS_HOST, CR_HOST,
+# Env: RPS (237), CONCURRENCY (16), ORCH_HOST, FS_HOST, CR_HOST,
 #      FOCUS (pprof -focus regexp for the console report, optional).
 set -e
 . "$(dirname "$0")/lib.sh"
